@@ -1,0 +1,33 @@
+// Grafana Alloy configuration — collects Docker container metrics and logs.
+
+// ── Docker metrics discovery ─────────────────────────────────────────────────
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+// ── Prometheus remote write ──────────────────────────────────────────────────
+prometheus.remote_write "default" {
+  endpoint {
+    url = "http://prometheus:9090/api/v1/write"
+  }
+}
+
+// ── Container metrics (cAdvisor-style via Docker) ────────────────────────────
+prometheus.scrape "docker_metrics" {
+  targets    = discovery.docker.containers.targets
+  forward_to = [prometheus.remote_write.default.receiver]
+}
+
+// ── Container log discovery ──────────────────────────────────────────────────
+loki.source.docker "container_logs" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.docker.containers.targets
+  forward_to = [loki.write.default.receiver]
+}
+
+// ── Loki write endpoint ─────────────────────────────────────────────────────
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
