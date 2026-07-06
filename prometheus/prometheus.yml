@@ -9,12 +9,20 @@ scrape_configs:
 
   - job_name: 'placeholder1-service'
     static_configs:
-      - targets: ['placeholder1-service:8080']
+      - targets: ['placeholder1-service:8082']
 
   - job_name: 'placeholder2-service'
     static_configs:
-      - targets: ['placeholder2-service:8080']
+      - targets: ['placeholder2-service:8081']
 
   - job_name: 'alloy'
     static_configs:
       - targets: ['alloy:12345']
+
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+
+  - job_name: 'traefik'
+    static_configs:
+      - targets: ['proxy:8082']

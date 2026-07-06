@@ -2,23 +2,124 @@
   "annotations": { "list": [] },
   "editable": true,
   "fiscalYearStartMonth": 0,
-  "graphTooltip": 1,
+  "graphTooltip": 2,
   "links": [],
   "panels": [
     {
-      "title": "CPU Usage per Container",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "title": "Running Containers",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
-          "unit": "percentunit",
-          "custom": { "fillOpacity": 20, "lineWidth": 2 }
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
         }
       },
       "targets": [
         {
-          "expr": "rate(container_cpu_usage_seconds_total{name!=\"\"}[5m])",
+          "expr": "count(container_last_seen{name=~\"$container\"})",
+          "legendFormat": "containers"
+        }
+      ]
+    },
+    {
+      "title": "Total CPU Usage",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.5 },
+              { "color": "red", "value": 0.8 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(container_cpu_usage_seconds_total{name=~\"$container\"}[5m]))",
+          "legendFormat": "total CPU"
+        }
+      ]
+    },
+    {
+      "title": "Total Memory Usage",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 536870912 },
+              { "color": "red", "value": 1073741824 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(container_memory_usage_bytes{name=~\"$container\"})",
+          "legendFormat": "total memory"
+        }
+      ]
+    },
+    {
+      "title": "Total Network Traffic",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1048576 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(container_network_receive_bytes_total{name=~\"$container\"}[5m])) + sum(rate(container_network_transmit_bytes_total{name=~\"$container\"}[5m]))",
+          "legendFormat": "total traffic"
+        }
+      ]
+    },
+    {
+      "title": "CPU Usage per Container",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": { "fillOpacity": 20, "lineWidth": 2, "showPoints": "never" }
+        }
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
+      },
+      "targets": [
+        {
+          "expr": "rate(container_cpu_usage_seconds_total{name=~\"$container\"}[5m])",
           "legendFormat": "{{name}}"
         }
       ]
@@ -26,17 +127,21 @@
     {
       "title": "Memory Usage per Container",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
-          "custom": { "fillOpacity": 20, "lineWidth": 2 }
+          "custom": { "fillOpacity": 20, "lineWidth": 2, "showPoints": "never" }
         }
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
       },
       "targets": [
         {
-          "expr": "container_memory_usage_bytes{name!=\"\"}",
+          "expr": "container_memory_usage_bytes{name=~\"$container\"}",
           "legendFormat": "{{name}}"
         }
       ]
@@ -44,7 +149,7 @@
     {
       "title": "Memory Usage % per Container",
       "type": "gauge",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
@@ -62,25 +167,55 @@
       },
       "targets": [
         {
-          "expr": "container_memory_usage_bytes{name!=\"\"} / container_spec_memory_limit_bytes{name!=\"\"} > 0",
+          "expr": "container_memory_usage_bytes{name=~\"$container\"} / container_spec_memory_limit_bytes{name=~\"$container\"} > 0",
           "legendFormat": "{{name}}"
+        }
+      ]
+    },
+    {
+      "title": "Container Memory RSS vs Cache",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": { "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" }
+        }
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
+      },
+      "targets": [
+        {
+          "expr": "container_memory_rss{name=~\"$container\"}",
+          "legendFormat": "{{name}} RSS"
+        },
+        {
+          "expr": "container_memory_cache{name=~\"$container\"}",
+          "legendFormat": "{{name}} cache"
         }
       ]
     },
     {
       "title": "Network RX (Received) per Container",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "Bps",
-          "custom": { "fillOpacity": 20, "lineWidth": 2 }
+          "custom": { "fillOpacity": 20, "lineWidth": 2, "showPoints": "never" }
         }
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
       },
       "targets": [
         {
-          "expr": "rate(container_network_receive_bytes_total{name!=\"\"}[5m])",
+          "expr": "rate(container_network_receive_bytes_total{name=~\"$container\"}[5m])",
           "legendFormat": "{{name}} RX"
         }
       ]
@@ -88,17 +223,21 @@
     {
       "title": "Network TX (Transmitted) per Container",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "Bps",
-          "custom": { "fillOpacity": 20, "lineWidth": 2 }
+          "custom": { "fillOpacity": 20, "lineWidth": 2, "showPoints": "never" }
         }
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
       },
       "targets": [
         {
-          "expr": "rate(container_network_transmit_bytes_total{name!=\"\"}[5m])",
+          "expr": "rate(container_network_transmit_bytes_total{name=~\"$container\"}[5m])",
           "legendFormat": "{{name}} TX"
         }
       ]
@@ -106,87 +245,176 @@
     {
       "title": "Disk I/O Read per Container",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "Bps",
-          "custom": { "fillOpacity": 20, "lineWidth": 2 }
+          "custom": { "fillOpacity": 20, "lineWidth": 2, "showPoints": "never" }
         }
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
       },
       "targets": [
         {
-          "expr": "rate(container_fs_reads_bytes_total{name!=\"\"}[5m])",
+          "expr": "rate(container_fs_reads_bytes_total{name=~\"$container\"}[5m])",
           "legendFormat": "{{name}} read"
         }
       ]
     },
     {
-      "title": "Running Containers",
-      "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 24 },
+      "title": "Disk I/O Write per Container",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "custom": { "fillOpacity": 20, "lineWidth": 2, "showPoints": "never" }
+        }
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
+      },
       "targets": [
         {
-          "expr": "count(container_last_seen{name!=\"\"})",
-          "legendFormat": "containers"
+          "expr": "rate(container_fs_writes_bytes_total{name=~\"$container\"}[5m])",
+          "legendFormat": "{{name}} write"
         }
       ]
     },
     {
-      "title": "Total CPU Usage",
-      "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 24 },
+      "title": "Container Restarts",
+      "description": "Tracks container restart counts — spikes indicate instability.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 36 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
-        "defaults": { "unit": "percentunit" }
+        "defaults": {
+          "custom": { "fillOpacity": 30, "lineWidth": 2, "drawStyle": "bars" }
+        }
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "bottom" }
       },
       "targets": [
         {
-          "expr": "sum(rate(container_cpu_usage_seconds_total{name!=\"\"}[5m]))",
-          "legendFormat": "total CPU"
+          "expr": "changes(container_last_seen{name=~\"$container\"}[5m])",
+          "legendFormat": "{{name}}"
         }
       ]
     },
     {
-      "title": "Total Memory Usage",
-      "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 24 },
+      "title": "Traefik Request Rate",
+      "description": "HTTP requests per second handled by Traefik, by entrypoint.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 36 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
-        "defaults": { "unit": "bytes" }
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "fillOpacity": 20, "lineWidth": 2, "showPoints": "never" }
+        }
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
       },
       "targets": [
         {
-          "expr": "sum(container_memory_usage_bytes{name!=\"\"})",
-          "legendFormat": "total memory"
+          "expr": "sum by (entrypoint) (rate(traefik_entrypoint_requests_total[5m]))",
+          "legendFormat": "{{entrypoint}}"
         }
       ]
     },
     {
-      "title": "Total Network Traffic",
-      "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 24 },
+      "title": "Traefik Response Status Codes",
+      "description": "HTTP response codes from Traefik — monitor 4xx/5xx rates.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 44 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
-        "defaults": { "unit": "Bps" }
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "fillOpacity": 20, "lineWidth": 2, "showPoints": "never" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byRegexp", "options": "5.." },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": "4.." },
+            "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": "2.." },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
       },
       "targets": [
         {
-          "expr": "sum(rate(container_network_receive_bytes_total{name!=\"\"}[5m])) + sum(rate(container_network_transmit_bytes_total{name!=\"\"}[5m]))",
-          "legendFormat": "total traffic"
+          "expr": "sum by (code) (rate(traefik_entrypoint_requests_total[5m]))",
+          "legendFormat": "{{code}}"
+        }
+      ]
+    },
+    {
+      "title": "Traefik Request Duration (p95)",
+      "description": "95th percentile request latency through Traefik.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 44 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" }
+        }
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, service) (rate(traefik_service_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{service}} p95"
         }
       ]
     }
   ],
   "refresh": "10s",
   "schemaVersion": 39,
-  "tags": ["docker", "containers", "monitoring"],
-  "templating": { "list": [] },
+  "tags": ["docker", "containers", "monitoring", "cadvisor", "traefik"],
+  "templating": {
+    "list": [
+      {
+        "name": "container",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": "label_values(container_last_seen, name)",
+        "regex": "",
+        "includeAll": true,
+        "allValue": ".+",
+        "current": { "text": "All", "value": "$__all" },
+        "multi": true,
+        "refresh": 2
+      }
+    ]
+  },
   "time": { "from": "now-1h", "to": "now" },
   "timepicker": {},
   "timezone": "browser",
   "title": "Docker Container Monitoring",
   "uid": "docker-monitoring",
-  "version": 1
+  "version": 2
 }

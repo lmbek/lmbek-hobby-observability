@@ -5,6 +5,33 @@ discovery.docker "containers" {
   host = "unix:///var/run/docker.sock"
 }
 
+// ── Relabel Docker targets to extract useful labels ─────────────────────────
+discovery.relabel "docker_labels" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container_name"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_compose_service"]
+    target_label  = "service"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_compose_project"]
+    target_label  = "project"
+  }
+}
+
 // ── Prometheus remote write ──────────────────────────────────────────────────
 prometheus.remote_write "default" {
   endpoint {
@@ -14,15 +41,30 @@ prometheus.remote_write "default" {
 
 // ── Container metrics (cAdvisor-style via Docker) ────────────────────────────
 prometheus.scrape "docker_metrics" {
-  targets    = discovery.docker.containers.targets
+  targets    = discovery.relabel.docker_labels.output
   forward_to = [prometheus.remote_write.default.receiver]
 }
 
-// ── Container log discovery ──────────────────────────────────────────────────
+// ── Container log collection ─────────────────────────────────────────────────
 loki.source.docker "container_logs" {
   host       = "unix:///var/run/docker.sock"
-  targets    = discovery.docker.containers.targets
+  targets    = discovery.relabel.docker_labels.output
+  forward_to = [loki.process.docker_logs.receiver]
+}
+
+// ── Process logs: add container labels ───────────────────────────────────────
+loki.process "docker_logs" {
   forward_to = [loki.write.default.receiver]
+
+  stage.docker {}
+
+  stage.labels {
+    values = {
+      container = "container",
+      service   = "service",
+      project   = "project",
+    }
+  }
 }
 
 // ── Loki write endpoint ─────────────────────────────────────────────────────

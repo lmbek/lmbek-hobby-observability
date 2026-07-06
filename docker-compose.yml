@@ -2,10 +2,16 @@
 # Connects directly to services, bypassing the proxy.
 # Usage: docker compose up -d
 
+name: monitoring
+
 services:
   # ── Prometheus ──────────────────────────────────────────────────────────────
   prometheus:
     image: prom/prometheus:latest
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-remote-write-receiver'
     ports:
       - "9090:9090"
     volumes:
@@ -13,7 +19,7 @@ services:
       - prometheus-data:/prometheus
     restart: unless-stopped
     networks:
-      - hobby-net
+      - hobby-internal
 
   # ── Grafana ─────────────────────────────────────────────────────────────────
   grafana:
@@ -26,11 +32,14 @@ services:
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_EXPLORE_ENABLED=true
+      - GF_FEATURE_TOGGLES_ENABLE=
     depends_on:
       - prometheus
+      - loki
     restart: unless-stopped
     networks:
-      - hobby-net
+      - hobby-internal
 
   # ── Grafana Alloy ───────────────────────────────────────────────────────────
   # Collects Docker container metrics and logs, forwards to Prometheus and Loki.
@@ -44,9 +53,10 @@ services:
     command:
       - run
       - /etc/alloy/config.alloy
+      - --server.http.listen-addr=0.0.0.0:12345
     restart: unless-stopped
     networks:
-      - hobby-net
+      - hobby-internal
 
   # ── Loki ────────────────────────────────────────────────────────────────────
   # Log aggregation — receives container logs from Alloy.
@@ -58,7 +68,22 @@ services:
       - loki-data:/loki
     restart: unless-stopped
     networks:
-      - hobby-net
+      - hobby-internal
+
+  # ── cAdvisor ─────────────────────────────────────────────────────────────────
+  # Exposes container-level CPU, memory, network, and disk metrics for Prometheus.
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    restart: unless-stopped
+    networks:
+      - hobby-internal
 
 volumes:
   prometheus-data:
@@ -66,6 +91,6 @@ volumes:
   loki-data:
 
 networks:
-  hobby-net:
+  hobby-internal:
     external: true
-    name: orchestrators_hobby-net
+    name: hobby-internal

@@ -6,9 +6,9 @@
   "links": [],
   "panels": [
     {
-      "title": "Container Logs (stdout/stderr)",
+      "title": "All Container Logs",
       "type": "logs",
-      "gridPos": { "h": 20, "w": 24, "x": 0, "y": 0 },
+      "gridPos": { "h": 16, "w": 24, "x": 0, "y": 0 },
       "datasource": { "type": "loki", "uid": "loki" },
       "options": {
         "showTime": true,
@@ -22,7 +22,7 @@
       },
       "targets": [
         {
-          "expr": "{container!=\"\"} |= ``",
+          "expr": "{container_name=~\".+\"}",
           "legendFormat": "",
           "refId": "A"
         }
@@ -31,7 +31,7 @@
     {
       "title": "Log Volume by Container",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
       "datasource": { "type": "loki", "uid": "loki" },
       "fieldConfig": {
         "defaults": {
@@ -40,15 +40,15 @@
       },
       "targets": [
         {
-          "expr": "sum by (container) (count_over_time({container!=\"\"}[1m]))",
-          "legendFormat": "{{container}}"
+          "expr": "sum by (container_name) (count_over_time({container_name=~\".+\"}[1m]))",
+          "legendFormat": "{{container_name}}"
         }
       ]
     },
     {
-      "title": "Error Logs",
+      "title": "Error & Warning Logs",
       "type": "logs",
-      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 28 },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 24 },
       "datasource": { "type": "loki", "uid": "loki" },
       "options": {
         "showTime": true,
@@ -59,9 +59,142 @@
       },
       "targets": [
         {
-          "expr": "{container!=\"\"} |~ \"(?i)(error|err|fatal|panic|exception)\"",
+          "expr": "{container_name=~\".+\"} |~ \"(?i)(error|err|fatal|panic|warn|exception)\"",
           "legendFormat": "",
           "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Service Logs (structured JSON)",
+      "description": "Structured slog JSON logs from placeholder services, parsed into fields.",
+      "type": "logs",
+      "gridPos": { "h": 16, "w": 24, "x": 0, "y": 36 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "targets": [
+        {
+          "expr": "{container_name=~\".*placeholder.*\"} | json",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "HTTP Request Rate by Service",
+      "description": "HTTP requests per minute from placeholder services.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 52 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 20, "lineWidth": 2 },
+          "unit": "reqpm"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (container_name) (count_over_time({container_name=~\".*placeholder.*\"} | json | msg = \"http request\" [1m]))",
+          "legendFormat": "{{container_name}}"
+        }
+      ]
+    },
+    {
+      "title": "Error Rate by Service",
+      "description": "Error-level log entries per minute from placeholder services.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 52 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 20, "lineWidth": 2 },
+          "color": { "mode": "fixed", "fixedColor": "red" },
+          "unit": "reqpm"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (container_name) (count_over_time({container_name=~\".*placeholder.*\"} | json | level = \"ERROR\" [1m]))",
+          "legendFormat": "{{container_name}}"
+        }
+      ]
+    },
+    {
+      "title": "Login Success vs Failure Rate",
+      "description": "Login attempts per minute — successful vs failed.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 60 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 20, "lineWidth": 2 },
+          "unit": "reqpm"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "failed" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "success" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "count_over_time({container_name=~\".*placeholder2.*\"} | json | msg = \"login successful\" [1m])",
+          "legendFormat": "success",
+          "refId": "A"
+        },
+        {
+          "expr": "count_over_time({container_name=~\".*placeholder2.*\"} | json | msg = \"login failed\" [1m])",
+          "legendFormat": "failed",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "Order Processing",
+      "description": "Orders created vs failed per minute.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 60 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 20, "lineWidth": 2 },
+          "unit": "reqpm"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "failed" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "created" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "count_over_time({container_name=~\".*placeholder1.*\"} | json | msg = \"order created\" [1m])",
+          "legendFormat": "created",
+          "refId": "A"
+        },
+        {
+          "expr": "count_over_time({container_name=~\".*placeholder1.*\"} | json | msg = \"order processing failed\" [1m])",
+          "legendFormat": "failed",
+          "refId": "B"
         }
       ]
     }
